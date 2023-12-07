@@ -53,3 +53,4 @@ if __name__ == '__main__':
     # params = None
     trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs)
     trainer.fit(model, cifar10_dm)
+    trainer.test(model, datamodule=cifar10_dm)

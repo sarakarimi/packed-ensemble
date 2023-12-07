@@ -1,9 +1,12 @@
+import torchmetrics
 from torch import nn, Tensor
 import torch.nn.functional as F
 from einops import rearrange
 from pytorch_lightning import LightningModule
 from torch import optim
-from torchmetrics.functional import accuracy
+import torch
+
+from uncertainty_models.utils.metrics import NLL
 
 
 class PackedConvLayer(nn.Module):
@@ -190,6 +193,11 @@ class PackedResNet(LightningModule):
         self.linear = PackedLinearLayer(block_planes * 8 * expansion, num_classes, alpha=alpha,
                                         num_estimators=num_estimators, last=True)
 
+        # Tests metrics
+        self.test_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=num_classes)
+        self.test_ece = torchmetrics.classification.CalibrationError(task="multiclass", num_classes=num_classes)
+        self.test_nll = NLL(reduction="sum")
+
     def _make_layer(self, block, planes, num_blocks, stride, alpha, num_estimators, gamma, groups, expansion):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
@@ -228,25 +236,40 @@ class PackedResNet(LightningModule):
         outputs = self.forward(inputs)
         # loss calculation
         loss = self.loss_fn(outputs, targets)
+
         return loss
 
     def evaluate(self, batch, stage=None):
         inputs, targets = batch
-        targets = targets.repeat(self.num_estimators)
+        # targets = targets.repeat(self.num_estimators)
         logits = self.forward(inputs)
-        loss = self.loss_fn(logits, targets)
-        preds = F.softmax(logits, dim=1).mean(dim=1)
-        # acc = accuracy(preds, targets, task="multiclass")
+        logits = rearrange(logits, "(n b) c -> b n c", n=self.num_estimators)
+        preds_probs = F.softmax(logits, dim=-1)
+        preds_probs = preds_probs.mean(dim=1)
 
-        if stage:
-            self.log(f"{stage}_loss", loss, prog_bar=True)
-            # self.log(f"{stage}_acc", acc, prog_bar=True)
+        acc = self.test_acc(preds_probs, targets)
+        ece = self.test_ece(preds_probs, targets)
+
+        if stage == "test":
+            self.log(f"{stage}_acc", acc, prog_bar=True)
+            self.log(f"{stage}_ece", ece, prog_bar=True)
 
     def validation_step(self, batch, batch_idx):
         self.evaluate(batch, "val")
 
     def test_step(self, batch, batch_idx):
         self.evaluate(batch, "test")
+        inputs, targets = batch
+        logits = self.forward(inputs)
+        logits = rearrange(logits, "(n b) c -> b n c", n=self.num_estimators)
+        preds_probs = F.softmax(logits, dim=-1)
+        preds_probs = preds_probs.mean(dim=1)
+
+        self.test_nll.update(preds_probs, targets)
+
+    def test_epoch_end(self, outputs):
+        self.log(f"test_nll", self.test_nll.compute(), prog_bar=True)
+        self.test_nll.reset()
 
     def configure_optimizers(self):
         optimizer = optim.SGD(self.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4)
