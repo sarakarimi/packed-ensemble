@@ -6,7 +6,7 @@ import torchvision
 import torch
 import os
 
-PATH_DATASETS = "/home/sara/repositories/packed-ensemble/datasets"
+PATH_DATASETS = "/datasets"
 BATCH_SIZE = 128 if torch.cuda.is_available() else 64
 NUM_WORKERS = int(os.cpu_count() / 2)
 
