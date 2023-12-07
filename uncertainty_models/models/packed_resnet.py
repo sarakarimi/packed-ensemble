@@ -4,85 +4,13 @@ import torch.nn.functional as F
 from einops import rearrange
 from pytorch_lightning import LightningModule
 from torch import optim
-import torch
-
+from uncertainty_models.layers.packed_layers import PackedConvLayer, PackedLinearLayer
 from uncertainty_models.utils.metrics import NLL
 
 
-class PackedConvLayer(nn.Module):
-
-    def __init__(
-            self, in_channels, out_channels, kernel_size, num_estimators, alpha, stride=1, gamma=1, groups=1,
-            padding=0, bias=True, first=False, last=False, device=None, dtype=None):
-
-        super().__init__()
-
-        # Input and output channel of each packed conv layer and number of groups per conv
-        ensemble_in_channels = int(in_channels * (1 if first else alpha))
-        ensemble_out_channels = int(out_channels * (num_estimators if last else alpha))
-        conv_groups = 1 if first else gamma * groups * num_estimators
-
-        # checking if the number of channels are divisible by group and
-        # if we have minimum 64 channels per group otherwise correcting the values
-        while (ensemble_in_channels % conv_groups != 0 or ensemble_in_channels // conv_groups < 64) and conv_groups // (
-                groups * num_estimators) > 1:
-            gamma -= 1
-            conv_groups = gamma * groups * num_estimators
-
-        if ensemble_in_channels % conv_groups:
-            ensemble_in_channels += (num_estimators - ensemble_in_channels % conv_groups)
-
-        if ensemble_out_channels % conv_groups:
-            ensemble_out_channels += (num_estimators - ensemble_out_channels % conv_groups)
-
-        self.packed_conv = nn.Conv2d(in_channels=ensemble_in_channels, out_channels=ensemble_out_channels,
-                                     kernel_size=kernel_size, stride=stride, padding=padding, dilation=1,
-                                     groups=conv_groups, bias=bias, padding_mode="zeros", device=device, dtype=dtype
-                                     )
-
-    def forward(self, x):
-        return self.packed_conv(x)
-
-
-class PackedLinearLayer(nn.Module):
-
-    def __init__(
-            self, in_features, out_features, alpha, num_estimators, gamma=1, bias=True, first=False,
-            last=False, device=None, dtype=None):
-
-        super().__init__()
-
-        # Input and output channel of each packed layer and number of groups per layer
-        ensemble_in = int(in_features * (1 if first else alpha))
-        ensemble_out = int(out_features * (num_estimators if last else alpha))
-        groups = num_estimators * gamma if not first else 1
-
-        # checking if the number of channels are divisible by group and
-        # otherwise correcting the values
-        if ensemble_in % groups:
-            ensemble_in += num_estimators - ensemble_in % groups
-
-        if ensemble_out % groups:
-            ensemble_out += num_estimators - ensemble_out % groups
-
-        self.linear = nn.Conv1d(in_channels=ensemble_in, out_channels=ensemble_out, kernel_size=1, stride=1, padding=0,
-                                dilation=1, groups=groups, bias=bias, padding_mode="zeros", device=device, dtype=dtype)
-        self.first = first
-        self.num_estimators = num_estimators
-
-    def forward(self, x):
-        x = x.unsqueeze(-1)
-        if not self.first:
-            x = rearrange(x, "(m e) c h -> e (m c) h", m=self.num_estimators)
-
-        x = self.linear(x)
-        x = rearrange(x, "e (m c) h -> (m e) c h", m=self.num_estimators).squeeze(-1)
-        return x
-
-
-class BasicBlock(nn.Module):
+class Resnet18Block(nn.Module):
     def __init__(self, in_planes, planes, stride=1, num_estimators=4, gamma=1, alpha=2, groups=1):
-        super(BasicBlock, self).__init__()
+        super(Resnet18Block, self).__init__()
 
         self.conv1 = PackedConvLayer(in_planes, planes, kernel_size=3, alpha=alpha, num_estimators=num_estimators,
                                      groups=groups, stride=stride, padding=1, bias=False)
@@ -111,12 +39,13 @@ class Resnet50Block(nn.Module):
     def __init__(self, in_planes, planes, stride=1, alpha=2, num_estimators=4, gamma=1, groups=1):
         super(Resnet50Block, self).__init__()
 
-        self.conv1 = PackedConvLayer(in_planes, planes, kernel_size=1, alpha=alpha, stride=stride,
-                                     num_estimators=num_estimators, gamma=1, groups=groups, bias=False)
+        self.conv1 = PackedConvLayer(in_planes, planes, kernel_size=1, alpha=alpha, num_estimators=num_estimators,
+                                     gamma=1, groups=groups, bias=False)
 
         self.bn1 = nn.BatchNorm2d(planes * alpha)
 
-        self.conv2 = PackedConvLayer(planes, planes, kernel_size=3, alpha=alpha, num_estimators=num_estimators,
+        self.conv2 = PackedConvLayer(planes, planes, kernel_size=3, padding=1, alpha=alpha,
+                                     num_estimators=num_estimators,
                                      gamma=gamma, stride=stride, groups=groups, bias=False,
                                      )
         self.bn2 = nn.BatchNorm2d(planes * alpha)
@@ -159,7 +88,7 @@ class PackedResNet(LightningModule):
 
         # settings of ResNet architectures
         if self.arch == "18":
-            block = BasicBlock
+            block = Resnet18Block
             num_blocks = [2, 2, 2, 2]
             expansion = 1
         elif arch == "50":
@@ -176,17 +105,17 @@ class PackedResNet(LightningModule):
 
         self.pooling = nn.Identity()
 
-        self.layer1 = self._make_layer(block, block_planes, num_blocks[0], stride=1, alpha=alpha,
-                                       num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
+        self.layer1 = self.make_block(block, block_planes, num_blocks[0], stride=1, alpha=alpha,
+                                      num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
 
-        self.layer2 = self._make_layer(block, block_planes * 2, num_blocks[1], stride=2, alpha=alpha,
-                                       num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
+        self.layer2 = self.make_block(block, block_planes * 2, num_blocks[1], stride=2, alpha=alpha,
+                                      num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
 
-        self.layer3 = self._make_layer(block, block_planes * 4, num_blocks[2], stride=2, alpha=alpha,
-                                       num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
+        self.layer3 = self.make_block(block, block_planes * 4, num_blocks[2], stride=2, alpha=alpha,
+                                      num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
 
-        self.layer4 = self._make_layer(block, block_planes * 8, num_blocks[3], stride=2, alpha=alpha,
-                                       num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
+        self.layer4 = self.make_block(block, block_planes * 8, num_blocks[3], stride=2, alpha=alpha,
+                                      num_estimators=num_estimators, gamma=gamma, groups=groups, expansion=expansion)
 
         self.pool = nn.AdaptiveAvgPool2d(output_size=1)
         self.flatten = nn.Flatten(1)
@@ -198,7 +127,7 @@ class PackedResNet(LightningModule):
         self.test_ece = torchmetrics.classification.CalibrationError(task="multiclass", num_classes=num_classes)
         self.test_nll = NLL(reduction="sum")
 
-    def _make_layer(self, block, planes, num_blocks, stride, alpha, num_estimators, gamma, groups, expansion):
+    def make_block(self, block, planes, num_blocks, stride, alpha, num_estimators, gamma, groups, expansion):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
         for stride in strides:

@@ -1,5 +1,5 @@
 import pytorch_lightning
-from uncertainty_models.models.packed_resnet import PackedResNet, BasicBlock
+from uncertainty_models.models.packed_resnet import PackedResNet
 from pl_bolts.datamodules import CIFAR10DataModule
 from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
 import torchvision
@@ -37,9 +37,12 @@ if __name__ == '__main__':
         val_transforms=test_transforms,
     )
 
-    arch = "18"
+    # arch can be either "18" or "50"
+    arch = "50"
     num_classes = 10
     num_channels = 3
+
+    # hyperparameters
     max_epochs = 1
     groups = 1
     gamma = 2
@@ -50,7 +53,6 @@ if __name__ == '__main__':
     model = PackedResNet(arch=arch, num_classes=num_classes, in_channels=num_channels,
                          groups=groups, gamma=gamma, alpha=alpha, num_estimators=num_estimators)
 
-    # params = None
     trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs)
     trainer.fit(model, cifar10_dm)
     trainer.test(model, datamodule=cifar10_dm)
