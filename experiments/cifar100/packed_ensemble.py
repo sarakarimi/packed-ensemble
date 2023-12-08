@@ -6,17 +6,17 @@ from uncertainty_models.utils.data_modules import CIFAR100DataModule
 from torchvision import transforms
 
 parser = argparse.ArgumentParser()
-parser.add_argument('max_epochs', type=int, default=75, help='Number of epochs to run for')
-parser.add_argument('groups', type=int, default=1, help='Number of groups')
-parser.add_argument('gamma', type=int, default=2, help='Number of sub-groups')
-parser.add_argument('alpha', type=int, default=2, help='The width-augmentation factor of Packed-Ensembles')
-parser.add_argument('num_estimator', type=int, default=4, help='The number of subnetworks in an ensemble')
-parser.add_argument('batch_size', type=int, default=128, help='Batch size')
-parser.add_argument('lr', type=float, default=0.05, help='Learning rate')
-parser.add_argument('momentum', type=float, default=0.9, help='Momentum of optimizer')
-parser.add_argument('decay', type=float, default=1e-4, help='Learning rate weight decay')
-parser.add_argument('opt_gamma', type=float, default=0.2, help='Gamma parameters in the optimizer')
-parser.add_argument('acrh', type=str, default="18", help='Resnet architecture, choices are "18" and "50"')
+parser.add_argument('--max_epochs', type=int, default=75, help='Number of epochs to run for')
+parser.add_argument('--groups', type=int, default=1, help='Number of groups')
+parser.add_argument('--gamma', type=int, default=2, help='Number of sub-groups')
+parser.add_argument('--alpha', type=int, default=2, help='The width-augmentation factor of Packed-Ensembles')
+parser.add_argument('--num_estimator', type=int, default=4, help='The number of subnetworks in an ensemble')
+parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
+parser.add_argument('--lr', type=float, default=0.05, help='Learning rate')
+parser.add_argument('--momentum', type=float, default=0.9, help='Momentum of optimizer')
+parser.add_argument('--decay', type=float, default=1e-4, help='Learning rate weight decay')
+parser.add_argument('--opt_gamma', type=float, default=0.2, help='Gamma parameters in the optimizer')
+parser.add_argument('--arch', type=str, default="18", help='Resnet architecture, choices are "18" and "50"')
 
 PATH_DATASETS = "/datasets"
 
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     )
 
     # setting for choice of architecture
-    arch = args.arch
+    arch = str(args.arch)
     if arch == "18":
         num_classes = 10
         num_channels = 3
