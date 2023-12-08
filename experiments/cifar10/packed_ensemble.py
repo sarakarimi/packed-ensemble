@@ -41,9 +41,10 @@ if __name__ == '__main__':
     arch = "50"
     num_classes = 10
     num_channels = 3
+    save_milestones = [60, 120, 160]  # [25, 50]
 
     # hyperparameters
-    max_epochs = 1
+    max_epochs = 200
     groups = 1
     gamma = 2
     alpha = 2
@@ -51,7 +52,8 @@ if __name__ == '__main__':
 
     # Model
     model = PackedResNet(arch=arch, num_classes=num_classes, in_channels=num_channels,
-                         groups=groups, gamma=gamma, alpha=alpha, num_estimators=num_estimators)
+                         groups=groups, gamma=gamma, alpha=alpha, num_estimators=num_estimators,
+                         save_milestones=save_milestones)
 
     trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs)
     trainer.fit(model, cifar10_dm)

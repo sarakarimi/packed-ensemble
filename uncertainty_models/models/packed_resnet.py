@@ -73,7 +73,7 @@ class Resnet50Block(nn.Module):
 
 
 class PackedResNet(LightningModule):
-    def __init__(self, arch, in_channels, num_classes, num_estimators, groups=1, alpha=2, gamma=1):
+    def __init__(self, arch, in_channels, num_classes, num_estimators, save_milestones, groups=1, alpha=2, gamma=1):
         super().__init__()
 
         self.arch = arch
@@ -83,6 +83,7 @@ class PackedResNet(LightningModule):
         self.gamma = gamma
         self.groups = groups
         self.num_estimators = num_estimators
+        self.save_milestones = save_milestones
 
         block_planes = self.in_planes
 
@@ -202,5 +203,5 @@ class PackedResNet(LightningModule):
 
     def configure_optimizers(self):
         optimizer = optim.SGD(self.parameters(), lr=0.05, momentum=0.9, weight_decay=5e-4)
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[25, 50], gamma=0.1)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.save_milestones, gamma=0.1)
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
