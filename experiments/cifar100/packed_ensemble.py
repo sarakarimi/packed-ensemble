@@ -18,7 +18,7 @@ parser.add_argument('--decay', type=float, default=1e-4, help='Learning rate wei
 parser.add_argument('--opt_gamma', type=float, default=0.2, help='Gamma parameters in the optimizer')
 parser.add_argument('--arch', type=str, default="18", help='Resnet architecture, choices are "18" and "50"')
 
-PATH_DATASETS = "/datasets"
+PATH_DATASETS = "/packed-ensemble/datasets"
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -45,10 +45,10 @@ if __name__ == '__main__':
     # setting for choice of architecture
     arch = str(args.arch)
     if arch == "18":
-        num_classes = 10
+        num_classes = 100
         num_channels = 3
         save_milestones = [25, 50]
-    if arch == "50":
+    elif arch == "50":
         num_classes = 10
         num_channels = 3
         save_milestones = [60, 120, 160]
