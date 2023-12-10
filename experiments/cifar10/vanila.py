@@ -14,10 +14,8 @@ root = Path(__file__).parent.absolute().parents[1]
 
 args = init_args(ResNet, CIFAR10DataModule)
 
-args.version = "batched"
-# args.arch = 50
-args.max_epochs = 200
-args.num_estimators = 4
+args.version = "vanilla"
+# args.arch = 18
 args.accelerator = "gpu"
 args.device = 1
 

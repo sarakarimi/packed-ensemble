@@ -19,7 +19,7 @@ parser.add_argument('--decay', type=float, default=5e-4, help='Learning rate wei
 parser.add_argument('--opt_gamma', type=float, default=0.2, help='Gamma parameters in the optimizer')
 parser.add_argument('--arch', type=str, default="18", help='Resnet architecture, choices are "18" and "50"')
 
-PATH_DATASETS = "/datasets"
+PATH_DATASETS = "/packed-ensemble/datasets"
 NUM_WORKERS = int(os.cpu_count() / 2)
 
 if __name__ == '__main__':
@@ -78,8 +78,10 @@ if __name__ == '__main__':
     # Model
     model = PackedResNet(arch=arch, num_classes=num_classes, in_channels=num_channels, groups=groups, gamma=gamma,
                          alpha=alpha, num_estimators=num_estimators, save_milestones=save_milestones, lr=lr,
-                         momentum=momentum, weight_decay=decay, opt_gamma=opt_gamma)
+                         momentum=momentum, weight_decay=decay, opt_gamma=opt_gamma, ablation=True, ml=True)
 
     trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs)
     trainer.fit(model, cifar10_dm)
     trainer.test(model, datamodule=cifar10_dm)
+
+

@@ -49,7 +49,7 @@ if __name__ == '__main__':
         num_channels = 3
         save_milestones = [25, 50]
     elif arch == "50":
-        num_classes = 10
+        num_classes = 100
         num_channels = 3
         save_milestones = [60, 120, 160]
     else:

@@ -1,3 +1,4 @@
+import torch
 import torchmetrics
 from torch import nn, Tensor
 import torch.nn.functional as F
@@ -74,7 +75,7 @@ class Resnet50Block(nn.Module):
 
 class PackedResNet(LightningModule):
     def __init__(self, arch, in_channels, num_classes, num_estimators, save_milestones, groups=1, alpha=2, gamma=1,
-                 lr=0.1, momentum=0.9, weight_decay=5e-4, opt_gamma=0.2):
+                 lr=0.1, momentum=0.9, weight_decay=5e-4, opt_gamma=0.2, ablation=False, msp=False, ml=False):
         super().__init__()
 
         self.arch = arch
@@ -89,6 +90,9 @@ class PackedResNet(LightningModule):
         self.momentum = momentum
         self.decay = weight_decay
         self.opt_gamma = opt_gamma
+        self.ablation = ablation
+        self.msp_criteria = msp
+        self.ml_criteria = ml
 
         block_planes = self.in_planes
 
@@ -131,6 +135,7 @@ class PackedResNet(LightningModule):
         # Tests metrics
         self.test_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=num_classes)
         self.test_ece = torchmetrics.classification.CalibrationError(task="multiclass", num_classes=num_classes)
+        self.test_aupr = torchmetrics.classification.BinaryAveragePrecision()
         self.test_nll = NLL(reduction="sum")
 
     def make_block(self, block, planes, num_blocks, stride, alpha, num_estimators, gamma, groups, expansion):
@@ -200,11 +205,22 @@ class PackedResNet(LightningModule):
         preds_probs = F.softmax(logits, dim=-1)
         preds_probs = preds_probs.mean(dim=1)
 
+        if self.ablation:
+            if self.msp_criteria:
+                ood = -preds_probs.max(-1)[0]
+            elif self.ml_criteria:
+                ood = -logits.mean(dim=1).max(dim=-1)[0]
+
+        self.test_aupr.update(ood, torch.ones_like(targets))
         self.test_nll.update(preds_probs, targets)
 
     def test_epoch_end(self, outputs):
         self.log(f"test_nll", self.test_nll.compute(), prog_bar=True)
         self.test_nll.reset()
+
+        if self.ablation:
+            self.log(f"test_aupr", self.test_aupr.compute(), prog_bar=True)
+            self.test_aupr.reset()
 
     def configure_optimizers(self):
         optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum, weight_decay=self.decay)
