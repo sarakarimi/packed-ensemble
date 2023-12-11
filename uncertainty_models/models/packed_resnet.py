@@ -197,13 +197,15 @@ class PackedResNet(LightningModule):
     def validation_step(self, batch, batch_idx):
         self.evaluate(batch, "val")
 
-    def test_step(self, batch, batch_idx):
-        self.evaluate(batch, "test")
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
         inputs, targets = batch
         logits = self.forward(inputs)
         logits = rearrange(logits, "(n b) c -> b n c", n=self.num_estimators)
         preds_probs = F.softmax(logits, dim=-1)
         preds_probs = preds_probs.mean(dim=1)
+
+        # acc = self.test_acc(preds_probs, targets)
+        # ece = self.test_ece(preds_probs, targets)
 
         if self.ablation:
             if self.msp_criteria:
@@ -211,12 +213,26 @@ class PackedResNet(LightningModule):
             elif self.ml_criteria:
                 ood = -logits.mean(dim=1).max(dim=-1)[0]
 
-        self.test_aupr.update(ood, torch.ones_like(targets))
-        self.test_nll.update(preds_probs, targets)
+        if dataloader_idx == 0:
+            self.test_nll.update(preds_probs, targets)
+            self.test_ece.update(preds_probs, targets)
+            self.test_acc.update(preds_probs, targets)
+
+            if self.ablation:
+                self.test_aupr.update(ood, torch.zeros_like(targets))
+
+        elif self.ablation and dataloader_idx == 1:
+            self.test_aupr.update(ood, torch.ones_like(targets))
+
+        return logits
 
     def test_epoch_end(self, outputs):
         self.log(f"test_nll", self.test_nll.compute(), prog_bar=True)
+        self.log(f"test_acc", self.test_acc.compute(), prog_bar=True)
+        self.log(f"test_ece", self.test_ece.compute(), prog_bar=True)
         self.test_nll.reset()
+        self.test_acc.reset()
+        self.test_ece.reset()
 
         if self.ablation:
             self.log(f"test_aupr", self.test_aupr.compute(), prog_bar=True)

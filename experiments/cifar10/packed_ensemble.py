@@ -7,7 +7,7 @@ import torchvision
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--max_epochs', type=int, default=75, help='Number of epochs to run for')
+parser.add_argument('--max_epochs', type=int, default=1, help='Number of epochs to run for')
 parser.add_argument('--groups', type=int, default=1, help='Number of groups')
 parser.add_argument('--gamma', type=int, default=2, help='Number of sub-groups')
 parser.add_argument('--alpha', type=int, default=2, help='The width-augmentation factor of Packed-Ensembles')
@@ -18,12 +18,15 @@ parser.add_argument('--momentum', type=float, default=0.9, help='Momentum of opt
 parser.add_argument('--decay', type=float, default=5e-4, help='Learning rate weight decay')
 parser.add_argument('--opt_gamma', type=float, default=0.2, help='Gamma parameters in the optimizer')
 parser.add_argument('--arch', type=str, default="18", help='Resnet architecture, choices are "18" and "50"')
+parser.add_argument('--seed', type=int, default=42, help='Random seed')
 
-PATH_DATASETS = "/packed-ensemble/datasets"
+PATH_DATASETS = "/home/sara/repositories/packed-ensemble/datasets"
 NUM_WORKERS = int(os.cpu_count() / 2)
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    pytorch_lightning.seed_everything(args.seed, workers=True)
 
     # dataset
     train_transforms = torchvision.transforms.Compose(
@@ -78,10 +81,12 @@ if __name__ == '__main__':
     # Model
     model = PackedResNet(arch=arch, num_classes=num_classes, in_channels=num_channels, groups=groups, gamma=gamma,
                          alpha=alpha, num_estimators=num_estimators, save_milestones=save_milestones, lr=lr,
-                         momentum=momentum, weight_decay=decay, opt_gamma=opt_gamma, ablation=True, ml=True)
+                         momentum=momentum, weight_decay=decay, opt_gamma=opt_gamma, ablation=True, msp=True)
 
-    trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs)
+    trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs, deterministic=True)
     trainer.fit(model, cifar10_dm)
-    trainer.test(model, datamodule=cifar10_dm)
+    for seed in [1000, 2000, 3000, 4000, 5000]:
+        pytorch_lightning.seed_everything(seed, workers=True)
+        trainer.test(model, datamodule=cifar10_dm)
 
 

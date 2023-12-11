@@ -16,10 +16,11 @@ args = init_args(ResNet, CIFAR100DataModule)
 
 args.version = "batched"
 # args.arch = 50
-args.max_epochs = 200
+# args.max_epochs = 200
 args.num_estimators = 4
 args.accelerator = "gpu"
 args.device = 1
+
 
 net_name = f"{args.version}-resnet{args.arch}-cifar10"
 

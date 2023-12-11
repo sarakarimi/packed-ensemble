@@ -17,11 +17,14 @@ parser.add_argument('--momentum', type=float, default=0.9, help='Momentum of opt
 parser.add_argument('--decay', type=float, default=1e-4, help='Learning rate weight decay')
 parser.add_argument('--opt_gamma', type=float, default=0.2, help='Gamma parameters in the optimizer')
 parser.add_argument('--arch', type=str, default="18", help='Resnet architecture, choices are "18" and "50"')
+parser.add_argument('--seed', type=int, default=42, help='Random seed')
 
 PATH_DATASETS = "/packed-ensemble/datasets"
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    pytorch_lightning.seed_everything(args.seed, workers=True)
 
     # dataset
     train_transforms = transforms.Compose([transforms.RandomCrop(32, padding=4),
@@ -71,6 +74,9 @@ if __name__ == '__main__':
                          alpha=alpha, num_estimators=num_estimators, save_milestones=save_milestones, lr=lr,
                          momentum=momentum, weight_decay=decay, opt_gamma=opt_gamma)
 
-    trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs)
+    trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs, deterministic=True)
     trainer.fit(model, cifar100_dm)
-    trainer.test(model, datamodule=cifar100_dm)
+
+    for seed in [1000, 2000, 3000, 4000, 5000]:
+        pytorch_lightning.seed_everything(seed, workers=True)
+        trainer.test(model, datamodule=cifar100_dm)
