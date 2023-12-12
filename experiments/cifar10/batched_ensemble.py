@@ -15,7 +15,7 @@ root = Path(__file__).parent.absolute().parents[1]
 args = init_args(ResNet, CIFAR10DataModule)
 
 args.version = "batched"
-# args.arch = 50
+args.arch = 50
 # args.max_epochs = 200
 args.num_estimators = 4
 args.accelerator = "gpu"
@@ -39,4 +39,9 @@ model = ResNet(
     **vars(args),
 )
 
-cli_main(model, dm, root, net_name, args)
+if args.test is not None:
+    for seed in [1000, 2000, 3000, 4000, 5000]:
+        args.seed = seed
+        cli_main(model, dm, root, net_name, args)
+else:
+    cli_main(model, dm, root, net_name, args)

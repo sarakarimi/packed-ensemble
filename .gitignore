@@ -1,0 +1,10 @@
+.venv
+data
+logs
+/experiments/cifar10/lightning_logs
+/experiments/cifar100/lightning_logs
+/datasets
+.idea
+
+__pycache__/
+
