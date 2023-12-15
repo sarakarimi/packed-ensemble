@@ -36,9 +36,4 @@ model = DeepEnsembles(
 
 args.test = -1
 
-if args.test is not None:
-    for seed in [1000, 2000, 3000, 4000, 5000]:
-        args.seed = seed
-        cli_main(model, dm, root, net_name, args)
-else:
-    cli_main(model, dm, root, net_name, args)
+cli_main(model, dm, root, net_name, args)

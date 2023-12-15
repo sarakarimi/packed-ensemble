@@ -77,6 +77,4 @@ if __name__ == '__main__':
     trainer = pytorch_lightning.Trainer(accelerator='gpu', devices=1, max_epochs=max_epochs, deterministic=True)
     trainer.fit(model, cifar100_dm)
 
-    for seed in [1000, 2000, 3000, 4000, 5000]:
-        pytorch_lightning.seed_everything(seed, workers=True)
-        trainer.test(model, datamodule=cifar100_dm)
+    trainer.test(model, datamodule=cifar100_dm)

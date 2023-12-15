@@ -19,6 +19,9 @@ else:
 args.num_estimators = 4
 args.accelerator = "gpu"
 args.device = 1
+args.log_path = "logs/vanilla-resnet18-cifar10"
+args.backbone = "resnet"
+args.versions = [2,3]
 
 net_name = f"de-{args.backbone}-cifar10"
 
@@ -36,9 +39,4 @@ model = DeepEnsembles(
 
 args.test = -1
 
-if args.test is not None:
-    for seed in [1000, 2000, 3000, 4000, 5000]:
-        args.seed = seed
-        cli_main(model, dm, root, net_name, args)
-else:
-    cli_main(model, dm, root, net_name, args)
+cli_main(model, dm, root, net_name, args)

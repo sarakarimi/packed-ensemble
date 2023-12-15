@@ -18,6 +18,8 @@ args.version = "vanilla"
 # args.arch = 18
 args.accelerator = "gpu"
 args.device = 1
+args.max_epochs = 1
+args.seed = 2000
 
 net_name = f"{args.version}-resnet{args.arch}-cifar10"
 
@@ -37,9 +39,4 @@ model = ResNet(
     **vars(args),
 )
 
-if args.test is not None:
-    for seed in [1000, 2000, 3000, 4000, 5000]:
-        args.seed = seed
-        cli_main(model, dm, root, net_name, args)
-else:
-    cli_main(model, dm, root, net_name, args)
+cli_main(model, dm, root, net_name, args)
